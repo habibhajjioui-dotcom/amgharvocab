@@ -1,0 +1,123 @@
+
+import { GoogleGenAI, Type, Modality } from "@google/genai";
+import { CEFRLevel, TranslateResponse, GenerateTextResponse } from "../types";
+
+// Always initialize with process.env.API_KEY directly
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+
+const CEFR_GUIDELINES: Record<CEFRLevel, string> = {
+  [CEFRLevel.A1]: "A1 Level: Breakthrough. Use basic vocabulary and present tense.",
+  [CEFRLevel.A2]: "A2 Level: Waystage. Simple sentences and common expressions.",
+  [CEFRLevel.B1]: "B1 Level: Threshold. Intermediate vocabulary, clear standard language.",
+  [CEFRLevel.B2]: "B2 Level: Vantage. Complex text on both concrete and abstract topics.",
+  [CEFRLevel.C1]: "C1 Level: Advanced. Professional language and implicit meaning.",
+  [CEFRLevel.C2]: "C2 Level: Mastery. Native-level precision and nuance."
+};
+
+export const generateReadingText = async (
+  level: CEFRLevel,
+  targetLanguage: string,
+  interests: string[] = [],
+  vocabToInclude: string[] = []
+): Promise<GenerateTextResponse> => {
+  const guidelines = CEFR_GUIDELINES[level];
+  const prompt = `Create an original ${targetLanguage} story (150 words). Level: ${guidelines}. Topics: ${interests.join(', ')}. Include these words: ${vocabToInclude.join(', ')}. Return ONLY JSON with title, content, target_language.`;
+
+  const response = await ai.models.generateContent({
+    model: "gemini-3-flash-preview",
+    contents: prompt,
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          title: { type: Type.STRING },
+          content: { type: Type.STRING },
+          target_language: { type: Type.STRING }
+        },
+        required: ["title", "content", "target_language"]
+      }
+    }
+  });
+  return JSON.parse(response.text);
+};
+
+export const translateWord = async (
+  word: string,
+  context: string,
+  targetLanguage: string,
+  nativeLanguage: string
+): Promise<TranslateResponse> => {
+  const prompt = `Analyze "${word}" from ${targetLanguage} in context: "${context}". Translate to ${nativeLanguage}. Return ONLY JSON.`;
+  const response = await ai.models.generateContent({
+    model: "gemini-3-flash-preview",
+    contents: prompt,
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          word: { type: Type.STRING },
+          pos: { type: Type.STRING },
+          translations: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                meaning: { type: Type.STRING },
+                translation: { type: Type.STRING },
+                confidence: { type: Type.NUMBER }
+              },
+              required: ["meaning", "translation", "confidence"]
+            }
+          },
+          example_target: { type: Type.STRING },
+          example_native: { type: Type.STRING },
+          tts_hint: { type: Type.STRING }
+        },
+        required: ["word", "pos", "translations", "example_target", "example_native", "tts_hint"]
+      }
+    }
+  });
+  return JSON.parse(response.text);
+};
+
+export const generateDistractors = async (word: string, context: string, targetLanguage: string): Promise<string[]> => {
+  const prompt = `Provide 3 incorrect but plausible words in ${targetLanguage} that could fit the grammar of "${context}" but are wrong for "${word}". Return JSON array.`;
+  const response = await ai.models.generateContent({
+    model: "gemini-3-flash-preview",
+    contents: prompt,
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: { type: Type.ARRAY, items: { type: Type.STRING } }
+    }
+  });
+  return JSON.parse(response.text);
+};
+
+export const generateSpeech = async (text: string, language: string): Promise<string> => {
+  const response = await ai.models.generateContent({
+    model: "gemini-2.5-flash-preview-tts",
+    contents: [{ parts: [{ text: `Speak in ${language}: ${text}` }] }],
+    config: {
+      responseModalities: [Modality.AUDIO],
+      speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } } },
+    },
+  });
+  return response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || '';
+};
+
+export const playAudio = async (base64: string) => {
+  const binaryString = atob(base64);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i);
+  const ctx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+  const dataInt16 = new Int16Array(bytes.buffer);
+  const buffer = ctx.createBuffer(1, dataInt16.length, 24000);
+  const channelData = buffer.getChannelData(0);
+  for (let i = 0; i < dataInt16.length; i++) channelData[i] = dataInt16[i] / 32768.0;
+  const source = ctx.createBufferSource();
+  source.buffer = buffer;
+  source.connect(ctx.destination);
+  source.start();
+};
