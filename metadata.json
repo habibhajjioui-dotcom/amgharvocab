@@ -1,0 +1,7 @@
+{
+  "name": "Amghar Vocab",
+  "description": "High-performance AI language reading protocol.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
