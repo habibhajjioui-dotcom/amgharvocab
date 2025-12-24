@@ -20,6 +20,8 @@ const App: React.FC = () => {
   const [isNavOpen, setIsNavOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  if (!store.isReady) return null;
+  
   const storeEnhanced = { ...store, setError };
 
   if (!store.settings.hasOnboarded) return <Onboarding store={storeEnhanced} />;
@@ -61,11 +63,10 @@ const App: React.FC = () => {
         {renderScreen()}
       </main>
 
-      {/* Floating Menu Toggle */}
       <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-50">
         <button 
           onClick={() => setIsNavOpen(!isNavOpen)}
-          className={`h-16 w-16 bg-accent text-white shadow-2xl flex items-center justify-center transition-all active:scale-90 rounded-[2rem] border-4 border-midnight`}
+          className={`h-16 w-16 bg-accent text-white shadow-2xl flex items-center justify-center transition-all active:scale-90 rounded-[2rem] border-4 border-midnight ${isNavOpen ? 'rotate-90' : ''}`}
         >
           <i className={`fa-solid ${isNavOpen ? 'fa-xmark' : 'fa-compass'} text-2xl`}></i>
         </button>
