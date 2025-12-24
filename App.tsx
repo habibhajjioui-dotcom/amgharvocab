@@ -20,11 +20,20 @@ const App: React.FC = () => {
   const [isNavOpen, setIsNavOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  if (!store.isReady) return null;
+  // Critical: prevent rendering before store hydration from localStorage
+  if (!store || !store.isReady) {
+    return (
+      <div className="h-screen bg-midnight flex items-center justify-center">
+        <div className="h-10 w-10 border-4 border-accent/20 border-t-accent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
   
   const storeEnhanced = { ...store, setError };
 
-  if (!store.settings.hasOnboarded) return <Onboarding store={storeEnhanced} />;
+  if (!store.settings.hasOnboarded) {
+    return <Onboarding store={storeEnhanced} />;
+  }
 
   const renderScreen = () => {
     switch (currentScreen) {
@@ -44,7 +53,9 @@ const App: React.FC = () => {
             <i className="fa-solid fa-triangle-exclamation text-lg"></i>
             {error}
           </div>
-          <button onClick={() => setError(null)} className="h-8 w-8 rounded-full bg-white/10 flex items-center justify-center"><i className="fa-solid fa-xmark"></i></button>
+          <button onClick={() => setError(null)} className="h-8 w-8 rounded-full bg-white/10 flex items-center justify-center">
+            <i className="fa-solid fa-xmark"></i>
+          </button>
         </div>
       )}
 
@@ -117,3 +128,4 @@ const NavButton: React.FC<{active: boolean, onClick: () => void, icon: string, l
 );
 
 export default App;
+
